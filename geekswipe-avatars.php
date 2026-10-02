@@ -3,7 +3,7 @@
  * Plugin Name:       Geekswipe Avatars
  * Plugin URI:        https://github.com/Geekswipe/geekswipe-avatars
  * Description:       Members upload their own profile picture from their bbPress or WordPress profile. A lightweight replacement for WP User Avatar that keeps its avatars, default avatar and size limit.
- * Version:           1.0.1
+ * Version:           1.1.0
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Karthikeyan KC
@@ -36,6 +36,9 @@ use WP_User;
 
 defined( 'ABSPATH' ) || exit;
 
+const VERSION           = '1.1.0';
+const SIZE              = 'geekswipe-avatar'; // Attachment size name of the square copy.
+const SQUARE_HOOK       = 'geekswipe_avatars_make_square';
 const FIELD             = 'geekswipe_avatar';
 const REMOVE            = 'geekswipe_avatar_remove';
 const FILE_META         = 'geekswipe_avatar_file';
@@ -288,20 +291,132 @@ function user_id_from( $id_or_email ): int {
 }
 
 /**
- * Path inside uploads for an attachment, preferring its square thumbnail
- * when one exists. Avatars uploaded through WP User Avatar were often stored
- * at full size.
+ * Path inside uploads for an attachment, preferring this plugin's square copy,
+ * then WordPress's square thumbnail. Avatars uploaded through WP User Avatar,
+ * and default images picked from the Media Library, were often stored at full
+ * size. When an attachment has neither and is larger than the avatar size or
+ * not square, the original is returned for now and a square copy is made in
+ * the background (see make_square()).
  *
  * @param int $attachment_id Attachment ID.
  */
 function attachment_file( int $attachment_id ): string {
 	$meta = wp_get_attachment_metadata( $attachment_id );
-	if ( is_array( $meta ) && ! empty( $meta['file'] ) ) {
-		$thumb = $meta['sizes']['thumbnail']['file'] ?? '';
-		return $thumb ? trailingslashit( dirname( $meta['file'] ) ) . $thumb : $meta['file'];
+	if ( ! is_array( $meta ) || empty( $meta['file'] ) ) {
+		return (string) get_post_meta( $attachment_id, '_wp_attached_file', true );
 	}
-	return (string) get_post_meta( $attachment_id, '_wp_attached_file', true );
+	foreach ( array( SIZE, 'thumbnail' ) as $size ) {
+		if ( ! empty( $meta['sizes'][ $size ]['file'] ) ) {
+			return size_path( $meta['file'], $meta['sizes'][ $size ]['file'] );
+		}
+	}
+	$width  = (int) ( $meta['width'] ?? 0 );
+	$height = (int) ( $meta['height'] ?? 0 );
+	if ( $width !== $height || $width > output_size() ) {
+		schedule_square( $attachment_id );
+	}
+	return $meta['file'];
 }
+
+/**
+ * Path inside uploads of one of an attachment's sizes.
+ *
+ * @param string $original Original file, relative to uploads.
+ * @param string $file     The size's file name.
+ */
+function size_path( string $original, string $file ): string {
+	$dir = dirname( $original );
+	return '.' === $dir ? $file : trailingslashit( $dir ) . $file;
+}
+
+/**
+ * Queue a square copy of an attachment. WordPress skips an identical event
+ * already queued in the next ten minutes, so repeat calls are cheap.
+ *
+ * @param int $attachment_id Attachment ID.
+ */
+function schedule_square( int $attachment_id ): void {
+	if ( ! wp_next_scheduled( SQUARE_HOOK, array( $attachment_id ) ) ) {
+		wp_schedule_single_event( time(), SQUARE_HOOK, array( $attachment_id ) );
+	}
+}
+
+/**
+ * Make a square copy of an attachment at the avatar size, record it as the
+ * attachment's SIZE, and point every render cache that uses the attachment at
+ * it. The original is never changed. WordPress deletes the copy with the
+ * attachment.
+ *
+ * @param int $attachment_id Attachment ID.
+ */
+function make_square( int $attachment_id ): void {
+	$meta = wp_get_attachment_metadata( $attachment_id );
+	$path = get_attached_file( $attachment_id );
+	if ( ! is_array( $meta ) || empty( $meta['file'] ) || ! empty( $meta['sizes'][ SIZE ] ) || ! $path || ! file_exists( $path ) ) {
+		return;
+	}
+
+	$editor = wp_get_image_editor( $path );
+	if ( is_wp_error( $editor ) ) {
+		return;
+	}
+	$dims = $editor->get_size();
+	$side = min( (int) $dims['width'], (int) $dims['height'], output_size() ); // Never upscale.
+	$editor->resize( $side, $side, true );
+	$editor->set_quality( 85 );
+	$saved = $editor->save( $editor->generate_filename( 'avatar-' . $side ) );
+	if ( is_wp_error( $saved ) ) {
+		return;
+	}
+	strip_metadata( $saved['path'] );
+
+	$meta['sizes']          = (array) ( $meta['sizes'] ?? array() );
+	$meta['sizes'][ SIZE ] = array(
+		'file'      => wp_basename( $saved['path'] ),
+		'width'     => (int) $saved['width'],
+		'height'    => (int) $saved['height'],
+		'mime-type' => $saved['mime-type'],
+		'filesize'  => (int) wp_filesize( $saved['path'] ),
+	);
+	wp_update_attachment_metadata( $attachment_id, $meta );
+
+	$file = size_path( $meta['file'], $meta['sizes'][ SIZE ]['file'] );
+	foreach ( array( meta_key(), legacy_key() ) as $key ) {
+		$users = get_users(
+			array(
+				'meta_key'   => $key, // phpcs:ignore WordPress.DB.SlowDBQuery -- Runs once per attachment, in cron.
+				'meta_value' => $attachment_id, // phpcs:ignore WordPress.DB.SlowDBQuery
+				'fields'     => 'ID',
+			)
+		);
+		foreach ( $users as $user_id ) {
+			update_user_meta( (int) $user_id, FILE_META, $file );
+		}
+	}
+	$default = get_option( 'geekswipe_avatars_default_file' );
+	if ( is_array( $default ) && (int) ( $default['id'] ?? 0 ) === $attachment_id ) {
+		$default['file'] = $file;
+		update_option( 'geekswipe_avatars_default_file', $default, true );
+	}
+}
+add_action( SQUARE_HOOK, __NAMESPACE__ . '\\make_square' );
+
+/**
+ * Render caches written before 1.1.0 can point at full-size originals.
+ * Clear them once, so each is recomputed on its next render and any oversized
+ * original is queued for a square copy.
+ */
+add_action(
+	'init',
+	function (): void {
+		if ( get_option( 'geekswipe_avatars_version' ) === VERSION ) {
+			return;
+		}
+		delete_metadata( 'user', 0, FILE_META, '', true );
+		delete_option( 'geekswipe_avatars_default_file' );
+		update_option( 'geekswipe_avatars_version', VERSION, true );
+	}
+);
 
 /**
  * Full URL of a path inside the uploads folder.

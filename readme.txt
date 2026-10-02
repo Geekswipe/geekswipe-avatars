@@ -4,7 +4,7 @@ Tags: avatar, profile picture, user avatar, bbpress, local avatar
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 1.0.1
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 
@@ -65,6 +65,9 @@ The field uses the theme's `label`, `field-group` and `field-help-text` classes,
 Avatars and settings stay in place, so reinstalling restores them.
 
 == Changelog ==
+
+= 1.1.0 =
+* Avatars stored at full size, such as those carried over from WP User Avatar or a default image picked from the Media Library, get a square copy at the avatar size. It is made in the background, and pages use it once it exists. The original is kept.
 
 = 1.0.1 =
 * Members without an uploaded picture show their Gravatar again, as they did with WP User Avatar. A setting turns this off.

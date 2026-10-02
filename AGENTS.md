@@ -34,11 +34,13 @@ The Discussion screen previews each default with `force_default`, which skips st
 | User meta | `{blog_prefix}geekswipe_avatar` | Avatar attachment ID |
 | User meta | `geekswipe_avatar_file` | Render cache, the image path inside uploads |
 | Post meta | `_geekswipe_avatar_user` | Owner of an avatar attachment |
+| Attachment size | `geekswipe-avatar` | Square copy of an avatar stored larger than the avatar size or not square. Made by the `geekswipe_avatars_make_square` cron event, which also rewrites the render caches that use it |
 | Option | `geekswipe_avatars_default` | Default avatar attachment ID |
 | Option | `geekswipe_avatars_default_file` | Cached default avatar path |
 | Option | `geekswipe_avatars_gravatar` | `1` shows Gravatar for members without an upload. Unset follows WP User Avatar's Disable Gravatar |
 | Option | `geekswipe_avatars_max_kb` | Upload limit in KB |
 | Option | `geekswipe_avatars_size` | Side of the square, in px |
+| Option | `geekswipe_avatars_version` | Plugin version whose render caches are in place. A change clears `geekswipe_avatar_file` and `geekswipe_avatars_default_file` once |
 
 WP User Avatar stored the same things in `{blog_prefix}user_avatar`, `_wp_attachment_wp_user_avatar` and `avatar_default_wp_user_avatar`, and its uninstaller deletes all of them and resets `avatar_default` to `mystery`. `copy_legacy_data()` copies them on activation and when WP User Avatar is deactivated. Legacy keys are read as a fallback only and never written. The `avatar_default` value `wp_user_avatar` is kept as the key for the site default, so existing sites keep their setting.
 
@@ -52,6 +54,7 @@ There is no automated test suite in this repository. Before a release, run these
 4. Permissions. A subscriber cannot change or remove another member's avatar, even with a nonce of their own.
 5. Order. With each Default Avatar and Gravatar on and off, an uploader shows their upload and a member without one gets the Gravatar URL with the right `d`, or the forced default.
 6. Render. A page of avatars runs no extra queries.
+7. Square copies. Point a user at a full-size, non-square attachment and render their avatar. The original shows, a `geekswipe_avatars_make_square` event is queued, and after it runs the user's render cache points at a square copy at the avatar size.
 
 ## Releasing
 

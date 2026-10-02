@@ -9,6 +9,7 @@ It is one PHP file with no settings page of its own, no scripts, no stylesheet, 
 - Accepts JPEG, PNG, WebP and GIF. SVG and files that only claim to be images are rejected.
 - Rejects pictures smaller than 96 × 96 pixels, larger than 36 million pixels, or over the upload limit.
 - Crops every upload to a square, 256 px by default, and strips EXIF, XMP and GPS data.
+- Makes a square copy at the same size of any avatar stored larger or not square, such as those carried over from WP User Avatar. The copy is made by WP-Cron, so no page waits for it.
 - Deletes the previous picture when a member replaces or removes theirs, and when a member is deleted.
 - Shows a member's uploaded picture first, then their Gravatar, then the Default Avatar chosen in Settings › Discussion. That can be your own image or a generated one such as Initials or RoboHash.
 - Gravatar can be turned off, so members without an upload always get the Default Avatar.

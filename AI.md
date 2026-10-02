@@ -17,7 +17,7 @@ Geekswipe Avatars is written with AI tools. This file says how, and what a perso
 
 I decided what the plugin does and how it behaves, and I read the code.
 
-Before 1.0.0 it passed the WordPress Coding Standards with no errors or warnings, and the tests in `AGENTS.md` on WordPress 7.1.2, PHP 8.2, bbPress 2.6.19 and Imagick.
+Version 1.0.1 passed the WordPress Coding Standards with no errors or warnings, and the tests in `AGENTS.md` on WordPress 7.1.2, PHP 8.2, bbPress 2.6.19 and Imagick.
 
 Not checked yet:
 

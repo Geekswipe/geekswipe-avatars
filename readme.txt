@@ -4,7 +4,7 @@ Tags: avatar, profile picture, user avatar, bbpress, local avatar
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 
@@ -12,18 +12,19 @@ Members upload their own profile picture from bbPress or their WordPress profile
 
 == Description ==
 
-Geekswipe Avatars lets members upload their own profile picture, from the bbPress Edit Profile form or from their WordPress profile. It replaces WP User Avatar, which now ships inside ProfilePress, and carries over everything WP User Avatar stored.
+Geekswipe Avatars lets members upload their own profile picture, from the bbPress Edit Profile form or from their WordPress profile. It can replace WP User Avatar and carries over everything WP User Avatar stored.
 
-It is one PHP file. It has no settings page of its own, no scripts, no stylesheet and makes no calls to other services.
+It is one PHP file. It has no settings page of its own, no scripts, no stylesheet, and the server makes no requests to other services.
 
 * Accepts JPEG, PNG, WebP and GIF. SVG and files that only claim to be images are rejected.
 * Rejects pictures smaller than 96 × 96 pixels, larger than 36 million pixels, or over the upload limit.
 * Crops every upload to a square, 256 px by default, and strips EXIF, XMP and GPS data.
 * Deletes the previous picture when a member replaces or removes theirs, and when a member is deleted.
-* Serves the site default avatar to members without a picture.
+* Shows a member's uploaded picture first, then their Gravatar, then the Default Avatar chosen in Settings › Discussion. That can be your own image or a generated one such as Initials or RoboHash.
+* Gravatar can be turned off, so members without an upload always get the Default Avatar.
 * Adds no database queries to a page that shows avatars.
 
-The upload limit and the avatar size are under Settings › Discussion › Avatars.
+The upload limit, the avatar size and the Gravatar switch are under Settings › Discussion › Avatars. The Settings link on the Plugins screen goes there.
 
 Development happens on [GitHub](https://github.com/Geekswipe/geekswipe-avatars).
 
@@ -49,11 +50,11 @@ In the uploads folder, as Media Library attachments owned by the member.
 
 = Does it contact Gravatar? =
 
-The plugin makes no requests of its own. A member without a picture gets the site default avatar. If no site default is set, WordPress shows its own default, which may come from Gravatar.
+The server makes no requests. Visitors' browsers load Gravatar for members without an uploaded picture, as WordPress does on its own. Gravatar shows the member's Gravatar, or the Default Avatar when they have none. With Gravatar turned off, members without an upload always get the Default Avatar. Generated defaults such as RoboHash are still drawn by Gravatar's servers.
 
-= Can I choose a new site default avatar? =
+= Which default avatars can I use? =
 
-Not yet. The default is the one carried over from WP User Avatar.
+Any of WordPress's Default Avatar choices in Settings › Discussion, such as Initials, RoboHash or Identicon, plus the site default image carried over from WP User Avatar. Uploading a new default image is not supported yet.
 
 = How do I style the bbPress field? =
 
@@ -64,6 +65,10 @@ The field uses the theme's `label`, `field-group` and `field-help-text` classes,
 Avatars and settings stay in place, so reinstalling restores them.
 
 == Changelog ==
+
+= 1.0.1 =
+* Members without an uploaded picture show their Gravatar again, as they did with WP User Avatar. A setting turns this off.
+* Settings link on the Plugins screen.
 
 = 1.0.0 =
 * First release.

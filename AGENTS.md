@@ -11,13 +11,21 @@ The whole plugin is `geekswipe-avatars.php`, namespaced `Geekswipe\Avatars`.
 These hold for every change. If a task needs one broken, stop and say so.
 
 - **One file.** No build step, no Composer dependencies at runtime, no scripts and no stylesheet. Themes style the field.
-- **No requests to other services.**
+- **The server makes no requests to other services.** Visitors' browsers load Gravatar, through the URL WordPress builds.
 - **No queries on render.** A page full of avatars must cost no more queries than it did without the plugin. The image path is cached in user meta (`geekswipe_avatar_file`) and the default avatar's path in an autoloaded option.
 - **Never delete what the member does not own.** An attachment is deleted only when its owner marker matches the member and no other user references it.
 - **Every upload is re-encoded.** Square crop, metadata stripped, no original kept.
 - **Capability and nonce on every write.** `save()` checks `edit_user` and the `update-user_{id}` nonce itself, even though WordPress and bbPress check them first.
 - **WordPress Coding Standards, clean.** `phpcs` with `phpcs.xml.dist` reports nothing. Prefix globals with `geekswipe_avatar` or keep them in the namespace. The text domain is `geekswipe-avatars`.
 - **PHP 8.1 and WordPress 6.4 are the floor.**
+
+## Which avatar shows
+
+1. The member's uploaded picture.
+2. With Gravatar on, their Gravatar. The Default Avatar is passed as Gravatar's `d` fallback, so nothing on the server checks whether a Gravatar exists.
+3. The Default Avatar from Settings › Discussion. `wp_user_avatar` means the site default image, served from uploads. Any other value is a Gravatar-generated default, forced with `f=y` when Gravatar is off.
+
+The Discussion screen previews each default with `force_default`, which skips steps 1 and 2.
 
 ## Data
 
@@ -28,6 +36,7 @@ These hold for every change. If a task needs one broken, stop and say so.
 | Post meta | `_geekswipe_avatar_user` | Owner of an avatar attachment |
 | Option | `geekswipe_avatars_default` | Default avatar attachment ID |
 | Option | `geekswipe_avatars_default_file` | Cached default avatar path |
+| Option | `geekswipe_avatars_gravatar` | `1` shows Gravatar for members without an upload. Unset follows WP User Avatar's Disable Gravatar |
 | Option | `geekswipe_avatars_max_kb` | Upload limit in KB |
 | Option | `geekswipe_avatars_size` | Side of the square, in px |
 
@@ -41,7 +50,8 @@ There is no automated test suite in this repository. Before a release, run these
 2. Uploads through the real bbPress form. A valid JPEG becomes a square of the configured size with no EXIF. A PNG replaces it and the old file is deleted. Too small, too large, a fake `.jpg` and an SVG are each rejected with a message, and the existing avatar stays.
 3. Remove. The file, the attachment and all meta are gone.
 4. Permissions. A subscriber cannot change or remove another member's avatar, even with a nonce of their own.
-5. Render. A page of avatars runs no extra queries.
+5. Order. With each Default Avatar and Gravatar on and off, an uploader shows their upload and a member without one gets the Gravatar URL with the right `d`, or the forced default.
+6. Render. A page of avatars runs no extra queries.
 
 ## Releasing
 

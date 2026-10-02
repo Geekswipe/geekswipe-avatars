@@ -3,7 +3,7 @@
  * Plugin Name:       Geekswipe Avatars
  * Plugin URI:        https://github.com/Geekswipe/geekswipe-avatars
  * Description:       Members upload their own profile picture from their bbPress or WordPress profile. A lightweight replacement for WP User Avatar that keeps its avatars, default avatar and size limit.
- * Version:           1.0.0
+ * Version:           1.0.1
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Karthikeyan KC
@@ -87,6 +87,18 @@ function max_bytes(): int {
 	return (int) min( ( $kb > 0 ? $kb : 2048 ) * KB_IN_BYTES, wp_max_upload_size() );
 }
 
+/**
+ * Whether members without an uploaded picture show their Gravatar. Until the
+ * option is saved, follow WP User Avatar's Disable Gravatar setting.
+ */
+function use_gravatar(): bool {
+	$value = get_option( 'geekswipe_avatars_gravatar' );
+	if ( false === $value ) {
+		return ! get_option( 'wp_user_avatar_disable_gravatar' );
+	}
+	return (bool) $value;
+}
+
 /** Side length of the square avatar written to disk, in pixels. */
 function output_size(): int {
 	$size = (int) get_option( 'geekswipe_avatars_size', 0 );
@@ -107,6 +119,9 @@ function activate(): void {
 			? max( (int) get_option( 'wp_user_avatar_resize_w' ), (int) get_option( 'wp_user_avatar_resize_h' ) )
 			: 0;
 		add_option( 'geekswipe_avatars_size', $legacy >= MIN_SOURCE ? $legacy : 256 );
+	}
+	if ( false === get_option( 'geekswipe_avatars_gravatar' ) ) {
+		add_option( 'geekswipe_avatars_gravatar', use_gravatar() ? '1' : '0' );
 	}
 
 	copy_legacy_data();
@@ -183,6 +198,17 @@ add_action(
 				'default'           => 256,
 			)
 		);
+		register_setting(
+			'discussion',
+			'geekswipe_avatars_gravatar',
+			array(
+				'type'              => 'boolean',
+				'sanitize_callback' => function ( $value ): string {
+					return $value ? '1' : '0';
+				},
+				'default'           => '1',
+			)
+		);
 
 		add_settings_field(
 			'geekswipe_avatars_max_kb',
@@ -208,6 +234,21 @@ add_action(
 					(int) MIN_SOURCE,
 					(int) output_size(),
 					esc_html__( 'Uploads are cropped to a square of this size. 256 px stays sharp on high-density screens.', 'geekswipe-avatars' )
+				);
+			},
+			'discussion',
+			'avatars'
+		);
+
+		add_settings_field(
+			'geekswipe_avatars_gravatar',
+			__( 'Gravatar', 'geekswipe-avatars' ),
+			function (): void {
+				printf(
+					'<label for="geekswipe_avatars_gravatar"><input name="geekswipe_avatars_gravatar" id="geekswipe_avatars_gravatar" type="checkbox" value="1"%1$s> %2$s</label><p class="description">%3$s</p>',
+					checked( use_gravatar(), true, false ),
+					esc_html__( 'Show a member\'s Gravatar when they have not uploaded a picture', 'geekswipe-avatars' ),
+					esc_html__( 'Members with no Gravatar get the Default Avatar chosen above. Turned off, members without an upload always get the Default Avatar.', 'geekswipe-avatars' )
 				);
 			},
 			'discussion',
@@ -344,14 +385,35 @@ add_filter(
 			}
 			return $args;
 		}
+		// 1. The member's uploaded picture.
 		$user_id = user_id_from( $id_or_email );
 		$url     = $user_id ? avatar_url( $user_id ) : '';
-		if ( '' === $url ) {
-			$url = default_avatar_url();
-		}
 		if ( '' !== $url ) {
 			$args['url']          = $url;
 			$args['found_avatar'] = true;
+			return $args;
+		}
+
+		// 2. Their Gravatar, then 3. the Default Avatar. WordPress builds the
+		// Gravatar URL with the default as Gravatar's own fallback, so the
+		// server never checks whether a Gravatar exists.
+		$default = default_avatar_url();
+		if ( $default ) {
+			$args['default'] = $default;
+		} elseif ( 'wp_user_avatar' === ( $args['default'] ?? '' ) ) {
+			$args['default'] = 'mm'; // The site default image is missing.
+		}
+		if ( use_gravatar() ) {
+			return $args;
+		}
+
+		// Gravatar turned off. The site default image is served from this
+		// server, and a generated default such as RoboHash is forced.
+		if ( $default ) {
+			$args['url']          = $default;
+			$args['found_avatar'] = true;
+		} else {
+			$args['force_default'] = true;
 		}
 		return $args;
 	},
@@ -657,6 +719,19 @@ function admin_field( WP_User $user ): void {
 }
 add_action( 'show_user_profile', __NAMESPACE__ . '\\admin_field' );
 add_action( 'edit_user_profile', __NAMESPACE__ . '\\admin_field' );
+
+add_filter(
+	'plugin_action_links_' . plugin_basename( __FILE__ ),
+	function ( array $links ): array {
+		$settings = sprintf(
+			'<a href="%s">%s</a>',
+			esc_url( admin_url( 'options-discussion.php#geekswipe_avatars_max_kb' ) ),
+			esc_html__( 'Settings', 'geekswipe-avatars' )
+		);
+		array_unshift( $links, $settings );
+		return $links;
+	}
+);
 
 add_action(
 	'user_edit_form_tag',

@@ -1,0 +1,4 @@
+# Development files stay out of the release zip.
+.gitattributes export-ignore
+*.md export-ignore
+phpcs.xml.dist export-ignore
